@@ -1,17 +1,5 @@
-==================================
+## Monasca Datasource - A datasource for use with the OpenStack Monasca api.
 
-Grafana - Monasca datasource Plugin
-=====================================
+For more information on Monasca see the [Monasca documentation](https://wiki.openstack.org/wiki/Monasca)
 
-Grafana plugin for the OpenStack Monasca api as a datasource
-
-Installation
-============
-
-Copy all files into <grafana_installation_directory>/public/app/plugins/datasource/monasca
-
-
-Status
-===================
-
-This plugin currently only supports authentication to monasca using keystone tokens.
+When combined with Grafana Keystone authentication this datasource supports using login credentials to authenticate queries.

@@ -1,17 +1,37 @@
 {
-  "pluginType": "datasource",
   "name": "Monasca",
+  "id": "grafana-monasca-datasource",
+  "type": "datasource",
 
-  "type": "monasca",
-  "serviceName": "MonascaDatasource",
-
-  "module": "app/plugins/datasource/monasca/datasource",
+  "staticRoot": ".",
 
   "partials": {
     "config": "app/plugins/datasource/monasca/partials/config.html"
   },
 
-  "defaultMatchFormat": "glob",
   "metrics": true,
-  "annotations": false
+  "annotations": false,
+
+  "info": {
+    "description": "datasource for the Monasca Api",
+    "author": {
+      "name": "OpenStack",
+      "url": "https://wiki.openstack.org/wiki/Monasca"
+    },
+    "logos": {
+      "small": "img/openstack_logo.png",
+      "large": "img/openstack_logo.png"
+    },
+    "links": [
+      {"name": "GitHub", "url": "https://github.com/grafana/simple-json-datasource"},
+      {"name": "License", "url": "https://github.com/grafana/simple-json-datasource/blob/master/LICENSE"}
+    ],
+    "version": "1.0.0",
+    "updated": "2016-06-15"
+  },
+
+  "dependencies": {
+    "grafanaVersion": "3.x.x",
+    "plugins": [ ]
+  }
 }

@@ -1,207 +1,170 @@
 define([
   'angular',
-  'lodash'
+  'lodash',
+  'app/plugins/sdk'
 ],
-function (angular, _) {
+function (angular, _, sdk) {
   'use strict';
 
-  var module = angular.module('grafana.controllers');
+  var MonascaQueryCtrl = (function(_super) {
+    var self;
+    var metricList = null;
+    var dimensionList = { 'keys' : [], 'values' : {} };
+    var currentDimension = null;
 
-  var metricList = null;
-  var currentDimension = null;
+    function MonascaQueryCtrl($scope, $injector, templateSrv, $q, uiSegmentSrv) {
+      _super.call(this, $scope, $injector);
+      this.q = $q;
+      this.uiSegmentSrv = uiSegmentSrv;
+      this.templateSrv = templateSrv;
 
-  module.controller('MonascaQueryCtrl', function($scope, uiSegmentSrv) {
-
-    $scope.init = function() {
-      if (!$scope.target.aggregator) {
-        $scope.target.aggregator = 'avg';
+      if (!this.target.aggregator) {
+        this.target.aggregator = 'avg';
       }
-      if (!$scope.target.dimensions) {
-        $scope.target.dimensions = [];
+      if (!this.target.period) {
+        this.target.period = '300';
       }
-      if ($scope.target.metric) {
-        $scope.resetDimensionList();
+      if (!this.target.dimensions) {
+        this.target.dimensions = [];
       }
-      validateTarget();
-    };
 
-    $scope.targetBlur = function() {
-      validateTarget();
-      if (!_.isEqual($scope.oldTarget, $scope.target) && _.isEmpty($scope.target.errors)) {
-        $scope.oldTarget = angular.copy($scope.target);
-        $scope.get_data();
+      self = this;
+      this.validateTarget();
+
+      if (this.target.metric) {
+        this.resetDimensionList();
       }
-    };
-
-    function validateTarget() {
-      $scope.target.errors = {};
-
-      $scope.validateMetric();
-      $scope.validateGroupBy();
-      $scope.validateDimensions();
     }
+
+    MonascaQueryCtrl.prototype = Object.create(_super.prototype);
+    MonascaQueryCtrl.prototype.constructor = MonascaQueryCtrl;
+
+    MonascaQueryCtrl.templateUrl = 'partials/query.editor.html';
+
+    MonascaQueryCtrl.prototype.targetBlur = function() {
+      self.validateTarget();
+      if (!_.isEqual(self.oldTarget, self.target) && _.isEmpty(self.target.error)) {
+        self.oldTarget = angular.copy(self.target);
+        self.refresh();
+      }
+    };
+
+    MonascaQueryCtrl.prototype.validateTarget = function() {
+      self.target.error = "";
+      if (!self.target.metric) {
+        self.target.error = "No metric specified";
+      }
+      if (self.target.aggregator != 'none' && !self.target.period) {
+        self.target.error = "You must supply a period when using an aggregator";
+      }
+      for (var i = 0; i < self.target.dimensions.length; i++) {
+        if (!self.target.dimensions[i].key) {
+          self.target.error = "One or more dimensions is missing a key";
+          break;
+        }
+        if (!self.target.dimensions[i].value){
+          self.target.error = "One or more dimensions is missing a value";
+          break;
+        }
+      }
+      if (self.target.error) {
+        console.log(self.target.error);
+      }
+    };
 
     //////////////////////////////
     // METRIC
     //////////////////////////////
 
-    $scope.suggestMetrics = function(query, callback) {
-      if (!$scope.metricList) {
-        $scope.$apply(function() {
-          $scope.datasource.namesQuery()
-              .then($scope.datasource.convertNamesList)
-              .then(function(metrics) {
-            $scope.metricList = metrics;
-            callback(metrics);
-          });
+    MonascaQueryCtrl.prototype.suggestMetrics = function(query, callback) {
+      if (!metricList) {
+        self.datasource.namesQuery()
+            .then(self.datasource.convertNamesList)
+            .then(function(metrics) {
+          metricList = metrics;
+          callback(metrics);
         });
       }
       else {
-        return $scope.metricList;
+        return metricList;
       }
     };
 
-    $scope.validateMetricChange = function() {
-      $scope.validateMetric();
-      $scope.resetDimensionList();
-    };
-
-    $scope.validateMetric = function() {
-      if (!$scope.target.metric) {
-        $scope.target.errors.metric = 'You must supply a metric name.';
-        return;
-      }
-      delete $scope.target.errors.metric;
+    MonascaQueryCtrl.prototype.onMetricChange = function() {
+      self.resetDimensionList();
+      self.targetBlur();
     };
 
     //////////////////////////////
-    // GROUP BY
+    // ALIAS
     //////////////////////////////
 
-    $scope.validateGroupBy = function() {
-      if ($scope.target.aggregator != 'none') {
-        if (!$scope.target.period) {
-          $scope.target.errors.period = 'Group By Time must be set';
-          return;
-        }
-
+    MonascaQueryCtrl.prototype.suggestAlias = function(query, callback) {
+      var upToLastTag = query.substr(0, query.lastIndexOf('@'));
+      var suggestions = self.datasource.listTemplates();
+      var dimensions = self.suggestDimensionKeys(query, callback);
+      for (var i = 0; i < dimensions.length; i++) {
+        suggestions.push(upToLastTag+"@"+dimensions[i]);
       }
-      delete $scope.target.errors.period;
+      return suggestions;
     };
 
     //////////////////////////////
     // DIMENSIONS
     //////////////////////////////
 
-    $scope.resetDimensionList = function() {
-      $scope.dimensionList = { 'keys' : [], 'values' : {} };
-      if (!$scope.target.errors.metric) {
-        $scope.datasource.metricsQuery({'name' : $scope.target.metric})
-            .then($scope.datasource.buildDimensionList)
+    MonascaQueryCtrl.prototype.resetDimensionList = function() {
+      dimensionList = { 'keys' : [], 'values' : {} };
+      if (self.target.metric) {
+        self.datasource.metricsQuery({'name' : self.target.metric})
+            .then(self.datasource.buildDimensionList)
             .then(function(dimensions) {
-          $scope.dimensionList = dimensions;
+          dimensionList = dimensions;
         });
       }
-      $scope.validateDimensions();
     };
 
-    $scope.suggestDimensionKeys = function(query, callback) {
-      if ($scope.dimensionList.keys.length === 0) {
-        if (!$scope.target.errors.metric) {
-          $scope.datasource.metricsQuery({'name' : $scope.target.metric})
-              .then($scope.datasource.buildDimensionList)
-              .then(function(dimensions) {
-            $scope.dimensionList = dimensions;
-            callback(dimensions.keys);
-          });
-        }
+    MonascaQueryCtrl.prototype.suggestDimensionKeys = function(query, callback) {
+      if (dimensionList.keys.length === 0 && self.target.metric) {
+        self.datasource.metricsQuery({'name' : self.target.metric})
+            .then(self.datasource.buildDimensionList)
+            .then(function(dimensions) {
+          dimensionList = dimensions;
+          callback(dimensions.keys);
+        });
       }
-      return $scope.dimensionList.keys;
+      else {
+        return dimensionList.keys;
+      }
     };
 
-    $scope.suggestDimensionValues = function(query, callback) {
-      if (_.isEmpty($scope.dimensionList.values)) {
-        if (!$scope.target.errors.metric) {
-          $scope.datasource.metricsQuery({'name' : $scope.target.metric})
-              .then($scope.datasource.buildDimensionList)
-              .then(function(dimensions) {
-            $scope.dimensionList = dimensions;
-            callback(dimensions.values[$scope.currentDimension.key]);
-          });
-        }
+    MonascaQueryCtrl.prototype.suggestDimensionValues = function(query, callback) {
+      var values = ['$all'];
+      values = values.concat(self.datasource.listTemplates());
+      if (currentDimension.key && currentDimension.key in dimensionList.values) {
+        values = values.concat(dimensionList.values[currentDimension.key]);
       }
-      var values = $scope.dimensionList.values[$scope.currentDimension.key];
-      values = values.concat($scope.datasource.listTemplates());
-      values.push("$all");
       return values;
     };
 
-    $scope.editDimension = function(index) {
-      $scope.currentDimension = $scope.target.dimensions[index]
-    }
-
-    $scope.addDimension = function() {
-      $scope.target.dimensions.push({})
-      $scope.validateDimension($scope.target.dimensions.length -1)
+    MonascaQueryCtrl.prototype.editDimension = function(index) {
+      currentDimension = self.target.dimensions[index];
     };
 
-    $scope.removeDimension = function(index) {
-      $scope.target.dimensions.splice(index, 1);
-      $scope.targetBlur();
+    MonascaQueryCtrl.prototype.addDimension = function() {
+      self.target.dimensions.push({});
     };
 
-    $scope.validateDimensions = function() {
-      for (var i = 0; i < $scope.target.dimensions.length; i++) {
-        $scope.validateDimension(i);
-      }
-      if (_.isEmpty($scope.target.errors.dimensions)) {
-        delete $scope.target.errors.dimensions;
-      }
-    }
-
-    $scope.validateDimension = function(index) {
-      var dimension = $scope.target.dimensions[index]
-
-      if (!("dimensions" in $scope.target.errors)) {
-        $scope.target.errors.dimensions = {}
-      }
-
-      if (!('key' in dimension) || dimension.key === '') {
-        $scope.target.errors.dimensions[index] = 'You must supply a dimension key.';
-        return;
-      }
-      if (!('value' in dimension) || dimension.value === '') {
-        $scope.target.errors.dimensions[index] = 'You must supply a dimension value.';
-        return;
-      }
-      delete $scope.target.errors.dimensions;
+    MonascaQueryCtrl.prototype.removeDimension = function(index) {
+      self.target.dimensions.splice(index, 1);
+      self.targetBlur();
     };
-
-    $scope.getDimensionErrors = function(index) {
-      if ("dimensions" in $scope.target.errors &&
-          index in $scope.target.errors.dimensions){
-        return $scope.target.errors.dimensions[index]
-      }
-      else {
-        return null
-      }
-    }
 
     //////////////////////////////
-    // ALIAS
-    //////////////////////////////
 
-    $scope.suggestAlias = function(query, callback) {
-      var suggestions = $scope.datasource.listTemplates()
-      var dimensions = $scope.suggestDimensionKeys(query, callback)
-      for (var i = 0; i < dimensions.length; i++) {
-        suggestions.push("@"+dimensions[i])
-      }
-      return suggestions;
-    };
+    return MonascaQueryCtrl;
 
-    $scope.init();
+  })(sdk.QueryCtrl);
 
-  });
-
+  return MonascaQueryCtrl;
 });
