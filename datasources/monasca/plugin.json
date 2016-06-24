@@ -1,9 +1,16 @@
 {
+  "pluginType": "datasource",
   "name": "Monasca",
-  "type": "datasource",
-  "id": "monasca",
 
-  "defaultMatchFormat": "glob",
-  "metrics": true,
-  "annotations": false
+  "type": "monasca",
+  "serviceName": "MonascaDatasource",
+
+  "module": "app/plugins/datasource/monasca/datasource",
+
+  "partials": {
+    "config": "app/plugins/datasource/monasca/partials/config.html",
+    "query": "app/plugins/datasource/monasca/partials/query.editor.html"
+  },
+
+  "metrics": true
 }

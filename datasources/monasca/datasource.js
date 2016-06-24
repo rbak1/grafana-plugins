@@ -2,7 +2,7 @@ define([
   'angular',
   'lodash',
   'app/core/utils/datemath',
-  'app/core/utils/kbn',
+  'app/components/kbn.js',
   './query_ctrl',
   'moment',
 ],
