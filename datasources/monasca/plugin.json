@@ -5,7 +5,7 @@
   "type": "monasca",
   "serviceName": "MonascaDatasource",
 
-  "module": "plugins/datasource/monasca/datasource",
+  "module": "app/plugins/datasource/monasca/datasource",
 
   "partials": {
     "config": "app/plugins/datasource/monasca/partials/config.html",
